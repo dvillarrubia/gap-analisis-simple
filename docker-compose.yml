@@ -1,8 +1,7 @@
 # ============================================
 # Content Gap Analysis V2
-# Docker Compose - Produccion
+# Docker Compose - Produccion con Traefik HTTPS
 # ============================================
-version: '3.8'
 
 services:
   # API Backend (Flask + Gunicorn)
@@ -12,8 +11,6 @@ services:
       dockerfile: Dockerfile
     container_name: content-gap-api
     restart: unless-stopped
-    ports:
-      - "5000:5000"
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
@@ -24,8 +21,6 @@ services:
       - huggingface-cache:/home/appuser/.cache/huggingface
       # Persistir uploads
       - ./uploads:/app/uploads
-      # Montar .env si existe
-      - ./.env:/app/.env:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -39,7 +34,13 @@ services:
         reservations:
           memory: 4G
     networks:
-      - content-gap-network
+      - root_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gap-analisis.rule=Host(`gap-analisis.srv817047.hstgr.cloud`)"
+      - "traefik.http.routers.gap-analisis.entrypoints=websecure"
+      - "traefik.http.routers.gap-analisis.tls.certresolver=myresolver"
+      - "traefik.http.services.gap-analisis.loadbalancer.server.port=5000"
 
 volumes:
   model-cache:
@@ -48,5 +49,5 @@ volumes:
     driver: local
 
 networks:
-  content-gap-network:
-    driver: bridge
+  root_default:
+    external: true

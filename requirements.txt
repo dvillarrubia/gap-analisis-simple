@@ -44,10 +44,10 @@ python-dotenv==1.0.0
 psycopg2-binary==2.9.9
 
 # ============================================
-# LLM PROVIDERS (opcional, para naming de clusters)
+# LLM PROVIDERS (opcional, no incluidos)
 # ============================================
-ollama==0.1.6
-openai==1.6.1
+# ollama==0.1.6    # Descomentarsi quieres usar Ollama
+# openai==1.6.1    # Descomentar si quieres usar OpenAI
 
 # ============================================
 # NOTAS DE INSTALACION

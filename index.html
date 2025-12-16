@@ -118,10 +118,10 @@
             const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
             try {
-                const r = await fetch('http://localhost:5000/health');
+                const r = await fetch('/health');
                 if (r.ok) {
                     dot.classList.add('online');
-                    text.textContent = 'Servidor activo - localhost:5000';
+                    text.textContent = 'Servidor activo';
                 } else {
                     throw new Error();
                 }

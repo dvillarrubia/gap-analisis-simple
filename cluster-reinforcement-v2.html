@@ -1809,7 +1809,7 @@
         // Check server
         async function checkServer() {
             try {
-                const r = await fetch('http://localhost:5000/health');
+                const r = await fetch('/health');
                 state.serverOnline = r.ok;
             } catch { state.serverOnline = false; }
 
@@ -1885,12 +1885,12 @@
                 showLoading(`Analizando con ${methodName}...`, 40);
 
                 // Try V2 endpoint first, fallback to V1
-                let endpoint = 'http://localhost:5000/analyze_cluster_reinforcement_v2';
+                let endpoint = '/analyze_cluster_reinforcement_v2';
                 let r = await fetch(endpoint, { method: 'POST', body: form });
 
                 if (!r.ok) {
                     // Fallback to V1
-                    endpoint = 'http://localhost:5000/analyze_cluster_reinforcement';
+                    endpoint = '/analyze_cluster_reinforcement';
                     form.append('min_cluster_size', '3');
                     r = await fetch(endpoint, { method: 'POST', body: form });
                 }
@@ -2167,7 +2167,7 @@
                 });
 
                 // Llamar al servidor para calcular similitud semántica
-                const response = await fetch('http://localhost:5000/semantic_filter', {
+                const response = await fetch('/semantic_filter', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -2618,7 +2618,7 @@
         // Saved analyses
         async function loadSavedAnalyses() {
             try {
-                const r = await fetch('http://localhost:5000/list_analyses?limit=10');
+                const r = await fetch('/list_analyses?limit=10');
                 if (!r.ok) throw new Error('Error cargando');
                 const data = await r.json();
                 renderSavedAnalyses(data.analyses || []);
@@ -2653,7 +2653,7 @@
         async function loadSavedAnalysis(id) {
             showLoading('Cargando análisis...', 50);
             try {
-                const r = await fetch(`http://localhost:5000/load_analysis/${id}`);
+                const r = await fetch(`/load_analysis/${id}`);
                 if (!r.ok) throw new Error('No encontrado');
                 state.data = await r.json();
                 renderResults();
@@ -2667,7 +2667,7 @@
         async function deleteAnalysis(id) {
             if (!confirm('¿Eliminar este análisis?')) return;
             try {
-                await fetch(`http://localhost:5000/delete_analysis/${id}`, {method: 'DELETE'});
+                await fetch(`/delete_analysis/${id}`, {method: 'DELETE'});
                 loadSavedAnalyses();
             } catch (e) { console.error(e); }
         }
@@ -2915,7 +2915,7 @@
         // Comparativa A/B
         async function loadCompareOptions() {
             try {
-                const r = await fetch('http://localhost:5000/list_analyses?limit=20');
+                const r = await fetch('/list_analyses?limit=20');
                 const data = await r.json();
                 const options = (data.analyses || []).map(a =>
                     `<option value="${a.id}">${a.name} (${new Date(a.created_at*1000).toLocaleDateString()})</option>`
@@ -2932,8 +2932,8 @@
 
             try {
                 const [rA, rB] = await Promise.all([
-                    fetch(`http://localhost:5000/load_analysis/${idA}`).then(r => r.json()),
-                    fetch(`http://localhost:5000/load_analysis/${idB}`).then(r => r.json())
+                    fetch(`/load_analysis/${idA}`).then(r => r.json()),
+                    fetch(`/load_analysis/${idB}`).then(r => r.json())
                 ]);
 
                 renderComparison(rA, rB);

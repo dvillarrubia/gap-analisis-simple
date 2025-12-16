@@ -39,7 +39,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.gap-analisis.rule=Host(`gap-analisis.srv817047.hstgr.cloud`)"
       - "traefik.http.routers.gap-analisis.entrypoints=websecure"
-      - "traefik.http.routers.gap-analisis.tls.certresolver=myresolver"
+      - "traefik.http.routers.gap-analisis.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gap-analisis.loadbalancer.server.port=5000"
 
 volumes:

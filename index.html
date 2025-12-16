@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Gap Analysis V2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 600px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #22d3ee, #0891b2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            border-color: #22d3ee;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(34, 211, 238, 0.1);
+        }
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #f1f5f9;
+        }
+        .card p {
+            color: #94a3b8;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+            color: #0f172a;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(34, 211, 238, 0.3);
+        }
+        .status {
+            margin-top: 40px;
+            padding: 16px 24px;
+            background: #0f172a;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+        .status-dot.online {
+            background: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+        .status-text {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Content Gap Analysis</h1>
+        <p class="subtitle">Analisis semantico de brechas de contenido</p>
+
+        <div class="card">
+            <h2>Cluster Reinforcement V2</h2>
+            <p>Analiza las keywords de tu sitio vs competidores para descubrir oportunidades de contenido usando clustering semantico con embeddings.</p>
+            <a href="cluster-reinforcement-v2.html" class="btn">Abrir Aplicacion</a>
+        </div>
+
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">Verificando servidor...</span>
+        </div>
+    </div>
+
+    <script>
+        async function checkServer() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            try {
+                const r = await fetch('http://localhost:5000/health');
+                if (r.ok) {
+                    dot.classList.add('online');
+                    text.textContent = 'Servidor activo - localhost:5000';
+                } else {
+                    throw new Error();
+                }
+            } catch {
+                dot.classList.remove('online');
+                text.textContent = 'Servidor offline - Ejecuta: python clustering_server.py';
+            }
+        }
+        checkServer();
+        setInterval(checkServer, 10000);
+    </script>
+</body>
+</html>

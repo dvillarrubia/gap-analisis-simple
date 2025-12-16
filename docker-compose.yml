@@ -1,0 +1,57 @@
+# ============================================
+# Content Gap Analysis V2
+# Docker Compose - Produccion
+# ============================================
+version: '3.8'
+
+services:
+  # API Backend (Flask + Gunicorn)
+  content-gap-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: content-gap-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      # LLM Configuration (opcional)
+      - LLM_PROVIDER=${LLM_PROVIDER:-none}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+    volumes:
+      # Persistir modelos descargados entre reinicios
+      - model-cache:/home/appuser/.cache
+      - huggingface-cache:/home/appuser/.cache/huggingface
+      # Persistir uploads
+      - ./uploads:/app/uploads
+      # Montar .env si existe
+      - ./.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    networks:
+      - content-gap-network
+
+volumes:
+  model-cache:
+    driver: local
+  huggingface-cache:
+    driver: local
+
+networks:
+  content-gap-network:
+    driver: bridge

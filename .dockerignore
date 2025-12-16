@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# Entorno local
+.env
+.env.local
+
+# Cache local
+*.db
+embeddings_cache.db
+.cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Documentacion
+*.md
+!README.md
+
+# Archivos temporales
+*.log
+logs/
+uploads/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

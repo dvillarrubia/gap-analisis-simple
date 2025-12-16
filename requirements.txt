@@ -1,0 +1,64 @@
+# SEO Clustering & Content Gap Analysis - Python Dependencies
+# Probado con Python 3.10 y 3.11
+
+# ============================================
+# CORE - Framework Web
+# ============================================
+flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
+waitress==2.1.2
+
+# ============================================
+# DATA PROCESSING
+# ============================================
+pandas==2.1.4
+openpyxl==3.1.2
+numpy==1.26.2
+
+# ============================================
+# MACHINE LEARNING / NLP
+# ============================================
+sentence-transformers>=2.7.0
+torch>=2.2.0
+transformers>=4.40.0
+umap-learn==0.5.5
+scikit-learn==1.3.2
+hdbscan>=0.8.38
+numba>=0.58.1
+
+# ============================================
+# WEB SCRAPING (extraccion de URLs)
+# ============================================
+beautifulsoup4==4.12.2
+requests==2.31.0
+
+# ============================================
+# CONFIGURACION
+# ============================================
+python-dotenv==1.0.0
+
+# ============================================
+# BASE DE DATOS (opcional)
+# ============================================
+psycopg2-binary==2.9.9
+
+# ============================================
+# LLM PROVIDERS (opcional, para naming de clusters)
+# ============================================
+ollama==0.1.6
+openai==1.6.1
+
+# ============================================
+# NOTAS DE INSTALACION
+# ============================================
+#
+# Para GPU (CUDA) - Instalar PyTorch con CUDA:
+# pip install torch==2.1.2+cu118 --index-url https://download.pytorch.org/whl/cu118
+#
+# Sin GPU (CPU only):
+# pip install torch==2.1.2+cpu --index-url https://download.pytorch.org/whl/cpu
+#
+# Primera ejecucion descarga modelos de Hugging Face (~1.5GB):
+# - sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (384D)
+# - hiiamsid/sentence_similarity_spanish_es (768D)

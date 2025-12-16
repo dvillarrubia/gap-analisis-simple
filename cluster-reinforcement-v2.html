@@ -1,0 +1,3150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Gap Analysis V2</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 20px 30px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .header h1 span { color: #22d3ee; }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #1e293b;
+            border-radius: 20px;
+            font-size: 0.85em;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .status-dot.online {
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        /* Main Layout */
+        .main {
+            display: grid;
+            grid-template-columns: 320px 1fr 420px;
+            height: calc(100vh - 72px);
+        }
+
+        .main.panel-collapsed {
+            grid-template-columns: 60px 1fr 420px;
+        }
+
+        /* Panel izquierdo */
+        .panel-left {
+            background: #1e293b;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #334155;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .panel-left.collapsed {
+            padding: 20px 10px;
+            overflow: hidden;
+        }
+
+        .panel-left.collapsed .section,
+        .panel-left.collapsed .section-title,
+        .panel-left.collapsed .upload-zone .label,
+        .panel-left.collapsed .upload-zone .filename,
+        .panel-left.collapsed .param-group,
+        .panel-left.collapsed .competitors-list,
+        .panel-left.collapsed .analyze-btn span,
+        .panel-left.collapsed #savedAnalyses {
+            display: none;
+        }
+
+        .collapse-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #334155;
+            border: none;
+            color: #94a3b8;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .collapse-btn:hover {
+            background: #475569;
+            color: #e2e8f0;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #22c55e;
+            color: #0f172a;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 9999;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toast.error {
+            background: #ef4444;
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(20px); }
+        }
+
+        /* Tooltips */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            white-space: nowrap;
+            z-index: 100;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        /* Upload zones */
+        .upload-zone {
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+
+        .upload-zone:hover {
+            border-color: #22d3ee;
+            background: rgba(34, 211, 238, 0.05);
+        }
+
+        .upload-zone.has-file {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .upload-zone input { display: none; }
+
+        .upload-zone .icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+
+        .upload-zone .label {
+            font-size: 0.9em;
+            color: #94a3b8;
+        }
+
+        .upload-zone .filename {
+            font-size: 0.8em;
+            color: #22c55e;
+            margin-top: 8px;
+            word-break: break-all;
+        }
+
+        /* Competitors list */
+        .competitors-list {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .competitor-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .competitor-item .name {
+            font-size: 0.85em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        .competitor-item .remove {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0 4px;
+        }
+
+        /* Params */
+        .param-group {
+            margin-bottom: 16px;
+        }
+
+        .param-group label {
+            display: block;
+            font-size: 0.8em;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .param-group input, .param-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.9em;
+        }
+
+        .param-group input:focus {
+            outline: none;
+            border-color: #22d3ee;
+        }
+
+        .slider-value {
+            font-size: 0.85em;
+            color: #22d3ee;
+            font-weight: 600;
+        }
+
+        /* Analyze button */
+        .analyze-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+            border: none;
+            border-radius: 10px;
+            color: #0f172a;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(34, 211, 238, 0.3);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Panel central */
+        .panel-center {
+            background: #0f172a;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            padding: 16px 20px;
+            border-radius: 12px;
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .stat-card .value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #22d3ee;
+        }
+
+        .stat-card .label {
+            font-size: 0.75em;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Clusters grid */
+        .clusters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .cluster-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .cluster-card:hover {
+            border-color: #334155;
+            transform: translateY(-2px);
+        }
+
+        .cluster-card.selected {
+            border-color: #22d3ee;
+            background: linear-gradient(135deg, #1e293b 0%, #164e63 100%);
+        }
+
+        .cluster-card .cluster-name {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #f1f5f9;
+        }
+
+        .cluster-card .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .cluster-card .metric {
+            text-align: center;
+        }
+
+        .cluster-card .metric .val {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #22d3ee;
+        }
+
+        .cluster-card .metric .lbl {
+            font-size: 0.7em;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+
+        .cluster-card .coverage-bar {
+            margin-top: 16px;
+            height: 12px;
+            background: #334155;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .cluster-card .coverage-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .cluster-card .coverage-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #94a3b8;
+            margin-top: 6px;
+        }
+
+        /* Panel derecho */
+        .panel-right {
+            background: #1e293b;
+            border-left: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .detail-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #334155;
+            position: sticky;
+            top: 0;
+            background: #1e293b;
+            z-index: 10;
+        }
+
+        .detail-header h2 {
+            font-size: 1.1em;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .detail-header .cluster-info {
+            display: flex;
+            gap: 12px;
+            font-size: 0.8em;
+            color: #94a3b8;
+            flex-wrap: wrap;
+        }
+
+        .detail-header .cluster-info strong {
+            color: #22d3ee;
+        }
+
+        .detail-header .cluster-meta {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 0.75em;
+        }
+
+        .detail-header .meta-badge {
+            background: #334155;
+            padding: 3px 8px;
+            border-radius: 4px;
+            color: #cbd5e1;
+        }
+
+        .detail-header .meta-badge.intent {
+            background: #3730a3;
+            color: #c7d2fe;
+        }
+
+        .detail-header .meta-badge.authority-high {
+            background: #166534;
+            color: #bbf7d0;
+        }
+
+        .detail-header .meta-badge.authority-low {
+            background: #991b1b;
+            color: #fecaca;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #334155;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 0.85em;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #22d3ee;
+            border-bottom-color: #22d3ee;
+        }
+
+        .tab .count {
+            background: #334155;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            margin-left: 6px;
+        }
+
+        .tab.active .count {
+            background: #22d3ee;
+            color: #0f172a;
+        }
+
+        /* Filtros y controles de keywords */
+        .kw-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #0f172a;
+            border-bottom: 1px solid #334155;
+            flex-wrap: wrap;
+        }
+
+        .intent-chips {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .intent-chips .chip {
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid #475569;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.75em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .intent-chips .chip:hover {
+            border-color: #22d3ee;
+            color: #22d3ee;
+        }
+
+        .intent-chips .chip.active {
+            background: #22d3ee;
+            border-color: #22d3ee;
+            color: #0f172a;
+        }
+
+        .kw-sort {
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #1e293b;
+            color: #e2e8f0;
+            font-size: 0.75em;
+            cursor: pointer;
+        }
+
+        .view-toggle-kw {
+            display: flex;
+            gap: 4px;
+        }
+
+        .view-toggle-kw button {
+            padding: 5px 8px;
+            border: 1px solid #475569;
+            background: transparent;
+            color: #64748b;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .view-toggle-kw button.active {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        /* Keywords list */
+        .keywords-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .keyword-card {
+            background: #0f172a;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .keyword-card:hover {
+            background: #1e293b;
+        }
+
+        .keyword-card:hover .kw-actions {
+            opacity: 1;
+        }
+
+        .kw-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .kw-actions button {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: #334155;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .kw-actions button:hover {
+            background: #475569;
+        }
+
+        .kw-text {
+            font-size: 0.95em;
+            color: #f1f5f9;
+            padding-right: 90px;
+            word-break: break-word;
+        }
+
+        .kw-url {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .keyword-card.gap {
+            border-left-color: #ef4444;
+        }
+
+        .keyword-card.owned {
+            border-left-color: #22c55e;
+        }
+
+        .keyword-card.weak {
+            border-left-color: #f59e0b;
+            background: #1c1a14;
+        }
+
+        .keyword-card.weak .weakness-badge {
+            display: inline-block;
+            background: #f59e0b;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .keyword-card.weak .weakness-reasons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .keyword-card.weak .reason-tag {
+            background: #44403c;
+            color: #fbbf24;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7em;
+        }
+
+        /* Authority Badge */
+        .authority-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .authority-badge.high { background: #166534; color: #bbf7d0; }
+        .authority-badge.medium { background: #854d0e; color: #fef08a; }
+        .authority-badge.low { background: #991b1b; color: #fecaca; }
+
+        /* Cannibalization */
+        .cannib-card {
+            background: #1c1917;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            border-left: 3px solid #dc2626;
+        }
+        .cannib-card.critical { border-left-color: #dc2626; }
+        .cannib-card.high { border-left-color: #f97316; }
+        .cannib-card.medium { border-left-color: #eab308; }
+        .cannib-urls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .cannib-url {
+            background: #292524;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            color: #a5a5a5;
+            max-width: 45%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .cannib-arrow { color: #dc2626; font-weight: bold; }
+        .severity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .severity-badge.critical { background: #dc2626; color: white; }
+        .severity-badge.high { background: #f97316; color: white; }
+        .severity-badge.medium { background: #eab308; color: #1c1917; }
+        .cannib-recommendation {
+            font-size: 0.8em;
+            color: #9ca3af;
+            margin-top: 8px;
+            padding: 8px;
+            background: #292524;
+            border-radius: 4px;
+        }
+        .cannib-conflicts {
+            margin-top: 8px;
+        }
+        .conflict-pair {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 0.75em;
+            color: #d4d4d4;
+            padding: 4px 0;
+        }
+        .conflict-pair .sim {
+            color: #f97316;
+            font-weight: 600;
+        }
+
+        /* Semantic Gaps / Conceptos */
+        .concept-card {
+            background: #1e1b4b;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            border-left: 3px solid #8b5cf6;
+        }
+        .concept-name {
+            font-size: 1em;
+            font-weight: 600;
+            color: #e0e7ff;
+            margin-bottom: 8px;
+        }
+        .pattern-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 8px 0;
+        }
+        .pattern-pill {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 500;
+        }
+        .pattern-pill.have { background: #166534; color: #bbf7d0; }
+        .pattern-pill.missing { background: #7c2d12; color: #fed7aa; }
+        .pattern-pill.competitor { background: #1e3a5f; color: #93c5fd; }
+        .concept-suggestions {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #312e81;
+        }
+        .suggestion-item {
+            font-size: 0.8em;
+            color: #a5b4fc;
+            padding: 4px 0;
+        }
+        .suggestion-item::before {
+            content: "💡 ";
+        }
+
+        .keyword-card .kw-text {
+            font-size: 0.95em;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+
+        .keyword-card .kw-url {
+            font-size: 0.75em;
+            color: #0891b2;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .keyword-card .kw-metrics {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75em;
+            color: #94a3b8;
+            flex-wrap: wrap;
+        }
+
+        .keyword-card .kw-metrics strong {
+            color: #22d3ee;
+        }
+
+        .keyword-card .competitors {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .keyword-card .comp-badge {
+            font-size: 0.7em;
+            padding: 2px 8px;
+            background: #334155;
+            border-radius: 4px;
+            color: #94a3b8;
+        }
+
+        .keyword-card .related {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #334155;
+        }
+
+        .keyword-card .related-title {
+            font-size: 0.7em;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .keyword-card .related-kw {
+            font-size: 0.8em;
+            color: #22c55e;
+            margin-right: 8px;
+        }
+
+        /* Score bar */
+        .score-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .score-track {
+            flex: 1;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .score-fill.high { background: linear-gradient(90deg, #22d3ee, #06b6d4); }
+        .score-fill.medium { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .score-fill.low { background: linear-gradient(90deg, #94a3b8, #64748b); }
+
+        .score-value {
+            font-size: 0.8em;
+            font-weight: 600;
+            color: #22d3ee;
+            min-width: 30px;
+            text-align: right;
+        }
+
+        /* Tabla de keywords */
+        .kw-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+
+        .kw-table thead {
+            position: sticky;
+            top: 0;
+            background: #1e293b;
+            z-index: 5;
+        }
+
+        .kw-table th {
+            text-align: left;
+            padding: 10px 8px;
+            color: #94a3b8;
+            font-weight: 500;
+            border-bottom: 1px solid #334155;
+            cursor: pointer;
+        }
+
+        .kw-table th:hover {
+            color: #22d3ee;
+        }
+
+        .kw-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #1e293b;
+            color: #e2e8f0;
+        }
+
+        .kw-table tr:hover td {
+            background: #1e293b;
+        }
+
+        .kw-table .kw-name {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kw-table .mini-score {
+            display: inline-block;
+            width: 40px;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .kw-table .mini-score-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .kw-table .kw-cell {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kw-table tr.selected td {
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        .score-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+
+        .score-badge.high {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .score-badge.medium {
+            background: rgba(250, 204, 21, 0.2);
+            color: #facc15;
+        }
+
+        .score-badge.low {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
+        /* Export */
+        .export-section {
+            padding: 16px;
+            border-top: 1px solid #334155;
+        }
+
+        .export-btn {
+            width: 100%;
+            padding: 12px;
+            background: #334155;
+            border: none;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-btn:hover:not(:disabled) {
+            background: #475569;
+        }
+
+        .export-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #64748b;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .empty-state .icon {
+            font-size: 3em;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            max-width: 280px;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .loading-overlay.active { display: flex; }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #334155;
+            border-top-color: #22d3ee;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-size: 1.1em;
+            color: #e2e8f0;
+        }
+
+        .progress-bar {
+            width: 280px;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22d3ee, #06b6d4);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Search */
+        .search-box {
+            padding: 12px 16px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.9em;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #22d3ee;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Nav */
+        .nav-bar {
+            background: #0f172a;
+            padding: 8px 20px;
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .nav-bar a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.85em;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-bar a:hover { background: #1e293b; color: #e2e8f0; }
+        .nav-bar a.active { background: #22d3ee; color: #0f172a; }
+        .nav-bar a.home { color: #22d3ee; font-weight: 600; }
+
+        /* Saved analyses */
+        .saved-analyses-list { max-height: 200px; overflow-y: auto; }
+        .saved-analysis-item {
+            padding: 10px 12px; background: #0f172a; border-radius: 8px;
+            margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .saved-analysis-item:hover { background: #1e293b; border-left-color: #22d3ee; }
+        .saved-analysis-item .name {
+            font-size: 0.85em; color: #e2e8f0; margin-bottom: 4px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .saved-analysis-item .meta { display: flex; gap: 10px; font-size: 0.7em; color: #64748b; }
+        .saved-analysis-item .meta strong { color: #22d3ee; }
+        .saved-analysis-item .del {
+            float: right; background: none; border: none; color: #ef4444;
+            cursor: pointer; opacity: 0; transition: opacity 0.2s;
+        }
+        .saved-analysis-item:hover .del { opacity: 1; }
+
+        /* Intent badges */
+        .intent-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 0.7em; font-weight: 600; text-transform: uppercase;
+        }
+        .intent-badge.informational { background: #3b82f6; color: white; }
+        .intent-badge.transactional { background: #22c55e; color: white; }
+        .intent-badge.commercial { background: #f59e0b; color: white; }
+        .intent-badge.navigational { background: #8b5cf6; color: white; }
+        .intent-badge.mixed { background: #64748b; color: white; }
+
+        /* Intent filter */
+        .intent-filter {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .intent-filter-btn {
+            padding: 6px 12px; border: 1px solid #334155; border-radius: 20px;
+            background: transparent; color: #94a3b8; font-size: 0.8em;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .intent-filter-btn:hover { border-color: #22d3ee; color: #22d3ee; }
+        .intent-filter-btn.active { background: #22d3ee; border-color: #22d3ee; color: #0f172a; }
+
+        /* Controls bar (ordenamiento + vista) */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sort-controls label {
+            font-size: 0.8em;
+            color: #64748b;
+        }
+
+        .sort-select {
+            padding: 6px 12px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: #22d3ee;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+        }
+
+        .view-btn {
+            padding: 6px 10px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            border-color: #22d3ee;
+            color: #22d3ee;
+        }
+
+        .view-btn.active {
+            background: #22d3ee;
+            border-color: #22d3ee;
+            color: #0f172a;
+        }
+
+        /* Vista tabla */
+        .clusters-table {
+            width: 100%;
+            border-collapse: collapse;
+            display: none;
+        }
+
+        .clusters-table.visible {
+            display: table;
+        }
+
+        .clusters-table th,
+        .clusters-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+
+        .clusters-table th {
+            background: #1e293b;
+            color: #64748b;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .clusters-table th:hover {
+            color: #22d3ee;
+        }
+
+        .clusters-table tr {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .clusters-table tr:hover {
+            background: rgba(34, 211, 238, 0.05);
+        }
+
+        .clusters-table tr.selected {
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        .clusters-grid.hidden {
+            display: none;
+        }
+
+        /* Indicador de más items */
+        .more-indicator {
+            text-align: center;
+            padding: 16px;
+            color: #64748b;
+            font-size: 0.85em;
+            border-top: 1px solid #334155;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .more-indicator:hover {
+            color: #22d3ee;
+            background: rgba(34, 211, 238, 0.05);
+        }
+
+        /* Multi-select */
+        .multi-select-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #164e63 0%, #1e293b 100%);
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .multi-select-bar.visible {
+            display: flex;
+        }
+
+        .multi-select-bar .count {
+            font-weight: 600;
+            color: #22d3ee;
+        }
+
+        .multi-select-bar .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .multi-select-bar button {
+            padding: 6px 12px;
+            background: #334155;
+            border: none;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .multi-select-bar button:hover {
+            background: #475569;
+        }
+
+        /* Checkbox para multi-select */
+        .keyword-checkbox {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            accent-color: #22d3ee;
+            cursor: pointer;
+        }
+
+        /* Export dropdown */
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .export-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .export-menu.visible {
+            display: block;
+        }
+
+        .export-menu-item {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            color: #e2e8f0;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .export-menu-item:hover {
+            background: #334155;
+        }
+
+        .export-menu-item .icon {
+            margin-right: 8px;
+        }
+
+        /* Comparativa A/B */
+        .compare-mode {
+            display: none;
+        }
+
+        .compare-mode.visible {
+            display: block;
+        }
+
+        .compare-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .compare-panel {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .compare-panel h3 {
+            font-size: 1em;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .compare-diff {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .compare-diff.added {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 3px solid #22c55e;
+        }
+
+        .compare-diff.removed {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #ef4444;
+        }
+
+        .compare-diff.changed {
+            background: rgba(251, 191, 36, 0.1);
+            border-left: 3px solid #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <a href="index.html" class="home">Topic Map</a>
+        <a href="topic-map-keywords-multilevel.html">Clustering</a>
+        <a href="content-gap-analysis-v2.html">Content Gap</a>
+        <a href="cluster-reinforcement.html">Refuerzo V1</a>
+        <a href="cluster-reinforcement-v2.html" class="active">Refuerzo V2</a>
+    </nav>
+
+    <header class="header">
+        <h1><span>Content Gap</span> Analysis V2</h1>
+        <div class="server-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Conectando...</span>
+        </div>
+    </header>
+
+    <main class="main" id="mainLayout">
+        <!-- Panel izquierdo -->
+        <aside class="panel-left" id="panelLeft">
+            <button class="collapse-btn" id="collapseBtn" title="Colapsar/Expandir panel">◀</button>
+            <section class="section">
+                <div class="section-title">Tu sitio web</div>
+                <div class="upload-zone" id="ownZone">
+                    <input type="file" id="ownFile" accept=".xlsx,.xls">
+                    <div class="icon">📊</div>
+                    <div class="label">Sube tu Excel de keywords</div>
+                    <div class="filename" id="ownName"></div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-title">Competidores</div>
+                <div class="competitors-list" id="compList"></div>
+                <div class="upload-zone" id="compZone" style="padding: 16px;">
+                    <input type="file" id="compFile" accept=".xlsx,.xls">
+                    <div class="label">+ Agregar competidor</div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-title">Configuracion</div>
+                <div class="param-group">
+                    <label>Columna de Keywords</label>
+                    <input type="text" id="kwColumn" value="Keyword">
+                </div>
+                <div class="param-group">
+                    <label>Umbral de similitud <span class="slider-value" id="simVal">0.70</span></label>
+                    <input type="range" id="simThresh" min="0.5" max="0.95" step="0.05" value="0.7">
+                </div>
+                <div class="param-group">
+                    <label>Numero de clusters</label>
+                    <input type="number" id="numClusters" value="15" min="5" max="50">
+                </div>
+                <div class="param-group">
+                    <label>Umbral canibalizacion <span class="slider-value" id="canibVal">0.95</span></label>
+                    <input type="range" id="canibThresh" min="0.80" max="0.98" step="0.01" value="0.95">
+                </div>
+                <div class="param-group">
+                    <label>Metodo de Clustering</label>
+                    <select id="clusteringMethod">
+                        <option value="kmeans">KMeans (fijo N clusters)</option>
+                        <option value="hdbscan">HDBSCAN (automatico)</option>
+                        <option value="louvain">Louvain (comunidades)</option>
+                    </select>
+                </div>
+                <div class="param-group" id="louvainResGroup" style="display: none;">
+                    <label>Resolucion Louvain <span class="slider-value" id="louvainResVal">1.0</span></label>
+                    <input type="range" id="louvainRes" min="0.5" max="2.0" step="0.1" value="1.0">
+                </div>
+            </section>
+
+            <button class="analyze-btn" id="analyzeBtn" disabled>Analizar Content Gap</button>
+
+            <section class="section" style="margin-top: 24px;">
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Analisis guardados</span>
+                    <button id="refreshAnalyses" style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 1em;">↻</button>
+                </div>
+                <div id="savedAnalyses" class="saved-analyses-list">
+                    <div style="color: #64748b; font-size: 0.85em; text-align: center; padding: 20px;">
+                        Cargando...
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- Panel central -->
+        <section class="panel-center">
+            <div class="stats-bar" id="statsBar" style="display: none;">
+                <div class="stat-card" data-tooltip="Total de keywords en tu sitio web">
+                    <div class="value" id="statOwn">-</div>
+                    <div class="label">Tus Keywords</div>
+                </div>
+                <div class="stat-card" data-tooltip="Keywords que tienen los competidores y tu no">
+                    <div class="value" id="statGaps">-</div>
+                    <div class="label">Gaps</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #451a03 0%, #78350f 100%);" data-tooltip="Keywords donde tu posicion es debil vs competidores">
+                    <div class="value" id="statWeak">-</div>
+                    <div class="label">A Mejorar</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #166534 0%, #15803d 100%);" data-tooltip="Puntuacion promedio de autoridad tematica (0-100)">
+                    <div class="value" id="statAuthority">-</div>
+                    <div class="label">Auth. Prom.</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);" data-tooltip="Pares de URLs compitiendo por las mismas keywords">
+                    <div class="value" id="statCannib">-</div>
+                    <div class="label">Canib.</div>
+                </div>
+                <div class="stat-card" data-tooltip="Grupos tematicos identificados">
+                    <div class="value" id="statClusters">-</div>
+                    <div class="label">Clusters</div>
+                </div>
+                <div class="stat-card" data-tooltip="Gaps no asignados a ningun cluster - Click para ver" style="cursor: pointer;" onclick="showUnassigned()">
+                    <div class="value" id="statUnassigned">-</div>
+                    <div class="label">Sin asignar</div>
+                </div>
+            </div>
+
+            <div class="intent-filter" id="intentFilter" style="display: none;">
+                <button class="intent-filter-btn active" data-intent="all">Todos</button>
+                <button class="intent-filter-btn" data-intent="informational">Informacional</button>
+                <button class="intent-filter-btn" data-intent="transactional">Transaccional</button>
+                <button class="intent-filter-btn" data-intent="commercial">Comercial</button>
+                <button class="intent-filter-btn" data-intent="navigational">Navegacional</button>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <div class="icon">📈</div>
+                <h3>Analiza tu Content Gap</h3>
+                <p>Sube tu archivo de keywords y al menos un competidor para identificar oportunidades de contenido</p>
+            </div>
+
+            <!-- Barra de controles -->
+            <div class="controls-bar" id="controlsBar" style="display: none;">
+                <div class="search-clusters" style="flex: 1; max-width: 400px; display: flex; gap: 8px;">
+                    <input type="text" id="searchClusters" placeholder="Buscar clusters... (ej: FP DAW)"
+                           style="flex: 1; padding: 8px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.85em;">
+                    <button id="semanticSearchBtn" title="Busqueda semantica (encuentra relacionados)"
+                            style="padding: 8px 12px; background: #334155; border: none; border-radius: 6px; color: #94a3b8; cursor: pointer; font-size: 0.9em; white-space: nowrap;">
+                        🔮 Semantica
+                    </button>
+                </div>
+                <div class="sort-controls">
+                    <label>Ordenar:</label>
+                    <select class="sort-select" id="sortSelect">
+                        <option value="gaps_desc">Gaps (mayor)</option>
+                        <option value="gaps_asc">Gaps (menor)</option>
+                        <option value="volume_desc">Volumen</option>
+                        <option value="authority_desc">Autoridad</option>
+                        <option value="coverage_desc">Cobertura</option>
+                        <option value="name_asc">Nombre (A-Z)</option>
+                    </select>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" id="viewGrid" title="Vista cuadricula">▦</button>
+                    <button class="view-btn" id="viewTable" title="Vista tabla">☰</button>
+                    <button class="view-btn" id="viewCompare" title="Comparar analisis">⟷</button>
+                </div>
+            </div>
+
+            <div class="clusters-grid" id="clustersGrid"></div>
+
+            <!-- Vista tabla alternativa -->
+            <table class="clusters-table" id="clustersTable">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Cluster</th>
+                        <th data-sort="own">Propios</th>
+                        <th data-sort="gaps">Gaps</th>
+                        <th data-sort="weak">Mejorar</th>
+                        <th data-sort="authority">Autoridad</th>
+                        <th data-sort="coverage">Cobertura</th>
+                        <th data-sort="intent">Intent</th>
+                    </tr>
+                </thead>
+                <tbody id="clustersTableBody"></tbody>
+            </table>
+
+            <!-- Modo comparativa -->
+            <div class="compare-mode" id="compareMode">
+                <div class="compare-container">
+                    <div class="compare-panel">
+                        <h3>Analisis A: <select id="compareA" class="sort-select" style="display:inline;width:auto;"></select></h3>
+                        <div id="compareContentA"></div>
+                    </div>
+                    <div class="compare-panel">
+                        <h3>Analisis B: <select id="compareB" class="sort-select" style="display:inline;width:auto;"></select></h3>
+                        <div id="compareContentB"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Panel derecho -->
+        <aside class="panel-right">
+            <div id="noSelection" class="empty-state">
+                <div class="icon">👆</div>
+                <p>Selecciona un cluster para ver los gaps y oportunidades</p>
+            </div>
+
+            <div id="detailPanel" style="display: none; flex-direction: column; height: 100%;">
+                <div class="detail-header">
+                    <h2 id="clusterName">-</h2>
+                    <div class="cluster-info">
+                        <span>Propios: <strong id="detailOwn">-</strong></span>
+                        <span>Gaps: <strong id="detailGaps">-</strong></span>
+                        <span>Vol: <strong id="detailVol">-</strong></span>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="searchKw" placeholder="Buscar keyword...">
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="gaps">Gaps <span class="count" id="countGaps">0</span></button>
+                    <button class="tab" data-tab="concepts">Conceptos <span class="count" id="countConcepts">0</span></button>
+                    <button class="tab" data-tab="owned">Tienes <span class="count" id="countOwned">0</span></button>
+                    <button class="tab" data-tab="improve">Mejorar <span class="count" id="countImprove">0</span></button>
+                    <button class="tab" data-tab="cannib">Canib. <span class="count" id="countCannib">0</span></button>
+                </div>
+
+                <!-- Controles de keywords -->
+                <div class="kw-controls">
+                    <div class="intent-chips" id="intentChips">
+                        <button class="chip active" data-intent="all">Todos</button>
+                        <button class="chip" data-intent="informational">Info</button>
+                        <button class="chip" data-intent="transactional">Trans</button>
+                        <button class="chip" data-intent="commercial">Comer</button>
+                        <button class="chip" data-intent="navigational">Navig</button>
+                    </div>
+                    <select id="kwSortBy" class="kw-sort">
+                        <option value="score_desc">Score (mayor)</option>
+                        <option value="volume_desc">Volumen (mayor)</option>
+                        <option value="kd_asc">KD (menor)</option>
+                        <option value="position_asc">Posicion (mejor)</option>
+                        <option value="alpha_asc">A-Z</option>
+                    </select>
+                    <div class="view-toggle-kw">
+                        <button id="viewCards" class="active" title="Vista cards">&#9638;</button>
+                        <button id="viewTableKw" title="Vista tabla">&#9776;</button>
+                    </div>
+                </div>
+
+                <!-- Barra multi-select -->
+                <div class="multi-select-bar" id="multiSelectBar">
+                    <span><span class="count" id="selectedCount">0</span> seleccionados</span>
+                    <div class="actions">
+                        <button onclick="exportSelected('xlsx')">Excel</button>
+                        <button onclick="exportSelected('csv')">CSV</button>
+                        <button onclick="clearSelection()">Deseleccionar</button>
+                    </div>
+                </div>
+
+                <div class="keywords-list" id="kwList"></div>
+
+                <!-- Vista tabla alternativa -->
+                <table class="kw-table" id="kwTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAllTable" onchange="toggleSelectAllTable(this)"></th>
+                            <th>Keyword</th>
+                            <th>Vol</th>
+                            <th>KD</th>
+                            <th>Score</th>
+                            <th>Intent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kwTableBody"></tbody>
+                </table>
+
+                <!-- Indicador de mas items -->
+                <div class="more-indicator" id="moreIndicator" style="display: none;" onclick="loadMoreKeywords()">
+                    Mostrando <span id="showingCount">100</span> de <span id="totalCount">0</span> items. Click para cargar mas...
+                </div>
+
+                <div class="export-section">
+                    <div class="export-dropdown">
+                        <div class="export-menu" id="exportMenu">
+                            <button class="export-menu-item" onclick="exportCluster('xlsx')"><span class="icon">📊</span>Excel (.xlsx)</button>
+                            <button class="export-menu-item" onclick="exportCluster('csv')"><span class="icon">📄</span>CSV (.csv)</button>
+                            <button class="export-menu-item" onclick="exportCluster('json')"><span class="icon">{ }</span>JSON (.json)</button>
+                            <button class="export-menu-item" onclick="exportAll('xlsx')" style="border-top: 1px solid #334155;"><span class="icon">📦</span>Todo el analisis (Excel)</button>
+                        </div>
+                        <button class="export-btn" id="exportBtn" disabled onclick="toggleExportMenu()">▲ Exportar</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Procesando...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const state = {
+            serverOnline: false,
+            ownFile: null,
+            competitors: [],
+            data: null,
+            selectedCluster: null,
+            currentTab: 'gaps',
+            intentFilter: 'all',
+            semanticSearchActive: false,
+            semanticResults: null,
+            // New: keyword panel state
+            kwIntentFilter: 'all',
+            kwSortBy: 'score_desc',
+            kwViewMode: 'cards', // 'cards' or 'table'
+            kwDisplayed: 0,
+            kwBatchSize: 50
+        };
+
+        // DOM
+        const $ = id => document.getElementById(id);
+
+        // Check server
+        async function checkServer() {
+            try {
+                const r = await fetch('http://localhost:5000/health');
+                state.serverOnline = r.ok;
+            } catch { state.serverOnline = false; }
+
+            $('statusDot').classList.toggle('online', state.serverOnline);
+            $('statusText').textContent = state.serverOnline ? 'Conectado' : 'Desconectado';
+            updateBtn();
+        }
+
+        function updateBtn() {
+            $('analyzeBtn').disabled = !state.serverOnline || !state.ownFile || state.competitors.length === 0;
+        }
+
+        // File handlers
+        function handleOwnFile(file) {
+            if (!file) return;
+            state.ownFile = file;
+            $('ownZone').classList.add('has-file');
+            $('ownName').textContent = file.name;
+            updateBtn();
+        }
+
+        function handleCompFile(file) {
+            if (!file || state.competitors.some(f => f.name === file.name)) return;
+            state.competitors.push(file);
+            renderCompetitors();
+            updateBtn();
+        }
+
+        function removeCompetitor(i) {
+            state.competitors.splice(i, 1);
+            renderCompetitors();
+            updateBtn();
+        }
+
+        function renderCompetitors() {
+            $('compList').innerHTML = state.competitors.map((f, i) => `
+                <div class="competitor-item">
+                    <span class="name">${f.name.replace(/\.(xlsx|xls)$/i, '')}</span>
+                    <button class="remove" onclick="removeCompetitor(${i})">×</button>
+                </div>
+            `).join('');
+        }
+
+        // Loading
+        function showLoading(text, progress) {
+            $('loading').classList.add('active');
+            $('loadingText').textContent = text;
+            $('progressFill').style.width = progress + '%';
+        }
+
+        function hideLoading() {
+            $('loading').classList.remove('active');
+        }
+
+        // Analyze
+        async function analyze() {
+            if (!state.serverOnline || !state.ownFile || !state.competitors.length) return;
+
+            showLoading('Preparando archivos...', 10);
+
+            try {
+                const form = new FormData();
+                form.append('own_file', state.ownFile);
+                state.competitors.forEach(f => form.append('competitor_files', f));
+                form.append('keyword_column', $('kwColumn').value);
+                form.append('similarity_threshold', $('simThresh').value);
+                form.append('cannibalization_threshold', $('canibThresh').value);
+                form.append('num_clusters', $('numClusters').value);
+                form.append('clustering_method', $('clusteringMethod').value);
+                form.append('louvain_resolution', $('louvainRes').value);
+
+                const methodName = {kmeans: 'KMeans', hdbscan: 'HDBSCAN', louvain: 'Louvain'}[$('clusteringMethod').value];
+                showLoading(`Analizando con ${methodName}...`, 40);
+
+                // Try V2 endpoint first, fallback to V1
+                let endpoint = 'http://localhost:5000/analyze_cluster_reinforcement_v2';
+                let r = await fetch(endpoint, { method: 'POST', body: form });
+
+                if (!r.ok) {
+                    // Fallback to V1
+                    endpoint = 'http://localhost:5000/analyze_cluster_reinforcement';
+                    form.append('min_cluster_size', '3');
+                    r = await fetch(endpoint, { method: 'POST', body: form });
+                }
+
+                showLoading('Procesando resultados...', 80);
+
+                if (!r.ok) {
+                    const err = await r.json();
+                    throw new Error(err.error || 'Error en analisis');
+                }
+
+                state.data = await r.json();
+                renderResults();
+                loadSavedAnalyses(); // Refresh saved analyses list
+                hideLoading();
+
+            } catch (e) {
+                console.error(e);
+                hideLoading();
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // Render results
+        function renderResults() {
+            if (!state.data) return;
+
+            const s = state.data.summary;
+            $('statsBar').style.display = 'flex';
+            $('statOwn').textContent = fmt(s.total_own_keywords);
+            $('statGaps').textContent = fmt(s.total_gaps);
+            $('statWeak').textContent = fmt(s.total_weak_keywords || 0);
+            $('statAuthority').textContent = (s.avg_authority_score || 0).toFixed(0);
+            $('statCannib').textContent = fmt(s.total_cannibalization_pairs || 0);
+            $('statClusters').textContent = s.total_clusters;
+            $('statUnassigned').textContent = fmt(s.gaps_unassigned || s.total_gaps - s.gaps_assigned);
+
+            $('emptyState').style.display = 'none';
+            $('intentFilter').style.display = 'flex';
+            $('controlsBar').style.display = 'flex';
+            renderClusters();
+        }
+
+        function renderClusters() {
+            let clusters = state.data.clusters;
+
+            // Filtrar por texto de búsqueda (busca en nombre Y en keywords)
+            const searchText = $('searchClusters')?.value?.toLowerCase().trim();
+            if (searchText && !state.semanticSearchActive) {
+                const terms = searchText.split(/\s+/);
+                clusters = clusters.filter(c => {
+                    // Buscar en nombre del cluster
+                    const nameMatch = terms.every(t => c.name.toLowerCase().includes(t));
+                    if (nameMatch) return true;
+                    // Buscar en keywords propias
+                    const ownMatch = (c.own_keywords || []).some(k =>
+                        terms.every(t => k.keyword?.toLowerCase().includes(t))
+                    );
+                    if (ownMatch) return true;
+                    // Buscar en gaps
+                    const gapMatch = (c.gap_keywords || []).some(k =>
+                        terms.every(t => k.keyword?.toLowerCase().includes(t))
+                    );
+                    return gapMatch;
+                });
+            }
+
+            // Si hay búsqueda semántica activa, usar los resultados ordenados
+            if (state.semanticSearchActive && state.semanticResults) {
+                const semanticIds = new Set(state.semanticResults.map(r => r.id || r.name));
+                clusters = clusters.filter(c => semanticIds.has(c.id) || semanticIds.has(c.name));
+                // Ordenar por similitud semántica
+                clusters.sort((a, b) => {
+                    const simA = state.semanticResults.find(r => r.id === a.id || r.name === a.name)?.similarity || 0;
+                    const simB = state.semanticResults.find(r => r.id === b.id || r.name === b.name)?.similarity || 0;
+                    return simB - simA;
+                });
+            } else {
+                // Filtrar por intent si está activo
+                if (state.intentFilter !== 'all') {
+                    clusters = clusters.filter(c => c.dominant_intent === state.intentFilter);
+                }
+                // Ordenar
+                const sortBy = $('sortSelect')?.value || 'gaps_desc';
+                clusters = sortClusters(clusters, sortBy);
+            }
+
+            $('clustersGrid').innerHTML = clusters.map(c => {
+                const cov = c.coverage || (c.own_keywords_count / (c.own_keywords_count + c.gap_keywords_count) * 100);
+                const covColor = cov >= 70 ? '#22c55e' : cov >= 40 ? '#fbbf24' : '#ef4444';
+                const clusterId = c.id || c.name;
+                const isSelected = state.selectedCluster?.name === c.name || state.selectedCluster?.id === c.id;
+
+                // Obtener similitud semántica si está activa la búsqueda
+                const semanticSim = state.semanticSearchActive && state.semanticResults
+                    ? state.semanticResults.find(r => r.name === c.name)?.similarity
+                    : null;
+
+                return `
+                    <div class="cluster-card ${isSelected ? 'selected' : ''}" onclick="selectCluster('${clusterId}')">
+                        <div class="cluster-name">
+                            ${c.name}
+                            ${semanticSim ? `<span style="background:#8b5cf6;color:white;padding:2px 6px;border-radius:4px;font-size:0.7em;margin-left:8px;">${(semanticSim*100).toFixed(0)}% sim</span>` : ''}
+                            ${c.dominant_intent ? `<span class="intent-badge ${c.dominant_intent}">${intentLabel(c.dominant_intent)}</span>` : ''}
+                        </div>
+                        <div class="metrics">
+                            <div class="metric">
+                                <div class="val">${c.own_keywords_count}</div>
+                                <div class="lbl">Propios</div>
+                            </div>
+                            <div class="metric">
+                                <div class="val">${c.gap_keywords_count}</div>
+                                <div class="lbl">Gaps</div>
+                            </div>
+                            <div class="metric" ${c.weak_keywords_count > 0 ? 'style="color: #fbbf24;"' : ''}>
+                                <div class="val">${c.weak_keywords_count || 0}</div>
+                                <div class="lbl">Mejorar</div>
+                            </div>
+                            <div class="metric">
+                                <div class="val">${(c.authority?.authority_score || 0).toFixed(0)}</div>
+                                <div class="lbl">Auth.</div>
+                            </div>
+                        </div>
+                        <div class="coverage-bar">
+                            <div class="coverage-fill" style="width: ${cov}%; background: ${covColor};"></div>
+                        </div>
+                        <div class="coverage-text">
+                            <span>Cobertura</span>
+                            <span style="color: ${covColor};">${cov.toFixed(0)}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectCluster(idOrName) {
+            const cluster = state.data.clusters.find(c => c.id === idOrName || c.name === idOrName);
+            if (!cluster) return;
+
+            state.selectedCluster = cluster;
+            renderClusters();
+            if (currentView === 'table') renderTable();
+
+            $('noSelection').style.display = 'none';
+            $('detailPanel').style.display = 'flex';
+
+            $('clusterName').textContent = cluster.name;
+            $('detailOwn').textContent = cluster.own_keywords_count;
+            $('detailGaps').textContent = cluster.gap_keywords_count;
+            $('detailVol').textContent = fmt(cluster.total_volume_gaps || cluster.total_volume || 0);
+
+            $('countGaps').textContent = cluster.gap_keywords_count;
+            $('countOwned').textContent = cluster.own_keywords_count;
+            $('countImprove').textContent = cluster.weak_keywords_count || 0;
+            $('countConcepts').textContent = (cluster.semantic_gaps || []).length;
+            $('countCannib').textContent = cluster.cannibalization?.summary?.total_pairs || 0;
+
+            $('exportBtn').disabled = false;
+            renderKeywords();
+        }
+
+        // Mostrar gaps sin asignar
+        function showUnassigned() {
+            if (!state.data?.unassigned_gaps?.length) {
+                showToast('No hay gaps sin asignar', true);
+                return;
+            }
+
+            // Deseleccionar cluster actual
+            state.selectedCluster = null;
+            renderClusters();
+
+            $('noSelection').style.display = 'none';
+            $('detailPanel').style.display = 'flex';
+
+            $('clusterName').textContent = 'Gaps Sin Asignar';
+            $('detailOwn').textContent = '0';
+            $('detailGaps').textContent = state.data.unassigned_gaps.length;
+            $('detailVol').textContent = fmt(state.data.unassigned_gaps.reduce((sum, g) => sum + (g.volume || 0), 0));
+
+            $('countGaps').textContent = state.data.unassigned_gaps.length;
+            $('countOwned').textContent = '0';
+            $('countImprove').textContent = '0';
+            $('countConcepts').textContent = '0';
+            $('countCannib').textContent = '0';
+
+            // Ocultar tabs que no aplican y forzar tab gaps
+            state.currentTab = 'gaps';
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab[data-tab="gaps"]').classList.add('active');
+
+            // Renderizar gaps sin asignar
+            const search = $('searchKw').value.toLowerCase();
+            let kws = state.data.unassigned_gaps;
+            if (search) {
+                kws = kws.filter(k => k.keyword.toLowerCase().includes(search));
+            }
+            kws.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
+
+            $('kwList').innerHTML = kws.slice(0, 100).map(k => {
+                const scoreClass = (k.opportunity_score || 0) >= 60 ? 'high' : (k.opportunity_score || 0) >= 30 ? 'medium' : 'low';
+                return `
+                    <div class="keyword-card gap">
+                        <div class="kw-text">
+                            ${k.keyword}
+                            ${k.intent ? `<span class="intent-badge ${k.intent}">${intentLabel(k.intent)}</span>` : ''}
+                        </div>
+                        <div class="kw-metrics">
+                            ${k.volume ? `<span>Vol: <strong>${fmt(k.volume)}</strong></span>` : ''}
+                            ${k.kd !== undefined ? `<span>KD: <strong>${k.kd}%</strong></span>` : ''}
+                            ${k.num_competitors ? `<span>Comp: <strong>${k.num_competitors}</strong></span>` : ''}
+                            ${k.max_similarity ? `<span>Sim max: <strong>${(k.max_similarity * 100).toFixed(0)}%</strong></span>` : ''}
+                        </div>
+                        ${k.competitors?.length ? `
+                            <div class="competitors">
+                                ${k.competitors.map(comp => `<span class="comp-badge">${comp}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                        ${k.opportunity_score !== undefined ? `
+                            <div class="score-bar">
+                                <div class="score-track">
+                                    <div class="score-fill ${scoreClass}" style="width: ${k.opportunity_score}%;"></div>
+                                </div>
+                                <div class="score-value">${k.opportunity_score.toFixed(0)}</div>
+                            </div>
+                        ` : ''}
+                        ${k.related_own_keywords?.length ? `
+                            <div class="related">
+                                <div class="related-title">Keywords relacionados tuyos:</div>
+                                ${k.related_own_keywords.map(r => `<span class="related-kw">${r.keyword} (${(r.similarity*100).toFixed(0)}%)</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('') || '<div class="empty-state"><p>No hay gaps sin asignar</p></div>';
+
+            // Mostrar indicador si hay mas
+            if (kws.length > 100) {
+                $('moreIndicator').style.display = 'block';
+                $('showingCount').textContent = '100';
+                $('totalCount').textContent = kws.length;
+            } else {
+                $('moreIndicator').style.display = 'none';
+            }
+
+            $('exportBtn').disabled = false;
+            showToast(`${state.data.unassigned_gaps.length} gaps sin asignar`);
+        }
+
+        // Búsqueda semántica de clusters
+        async function semanticSearchClusters() {
+            const query = $('searchClusters').value.trim();
+            if (!query) {
+                showToast('Escribe algo para buscar', true);
+                return;
+            }
+            if (!state.data?.clusters?.length) {
+                showToast('Primero carga un análisis', true);
+                return;
+            }
+
+            const btn = $('semanticSearchBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Buscando...';
+
+            try {
+                // Construir representación de cada cluster con sus keywords principales
+                const clusterData = state.data.clusters.map(c => {
+                    // Combinar nombre + top keywords para mejor representación semántica
+                    const topOwn = (c.own_keywords || []).slice(0, 3).map(k => k.keyword);
+                    const topGaps = (c.gap_keywords || []).slice(0, 2).map(k => k.keyword);
+                    const representative = [c.name, ...topOwn, ...topGaps].join(' ');
+                    return { id: c.id || c.name, name: c.name, text: representative };
+                });
+
+                // Llamar al servidor para calcular similitud semántica
+                const response = await fetch('http://localhost:5000/semantic_filter', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        query: query,
+                        candidates: clusterData.map(c => c.text),
+                        threshold: 0.35,
+                        top_k: 30
+                    })
+                });
+
+                if (!response.ok) throw new Error('Error en búsqueda semántica');
+
+                const data = await response.json();
+
+                // Mapear resultados de vuelta a clusters usando índice
+                state.semanticResults = data.results.map(r => ({
+                    name: clusterData[r.index].name,
+                    id: clusterData[r.index].id,
+                    similarity: r.similarity
+                }));
+                state.semanticSearchActive = true;
+
+                // Actualizar UI
+                btn.style.background = '#22d3ee';
+                btn.style.color = '#0f172a';
+                btn.textContent = '✓ ' + state.semanticResults.length + ' relacionados';
+
+                renderClusters();
+                showToast(`${state.semanticResults.length} clusters relacionados con "${query}"`);
+
+            } catch (e) {
+                console.error(e);
+                showToast('Error en búsqueda semántica: ' + e.message, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Limpiar búsqueda semántica
+        function clearSemanticSearch() {
+            state.semanticSearchActive = false;
+            state.semanticResults = null;
+            $('searchClusters').value = '';
+            const btn = $('semanticSearchBtn');
+            btn.style.background = '#334155';
+            btn.style.color = '#94a3b8';
+            btn.textContent = '🔮 Semantica';
+            renderClusters();
+        }
+
+        function renderKeywords(append = false) {
+            if (!state.selectedCluster) return;
+
+            const c = state.selectedCluster;
+            const search = $('searchKw').value.toLowerCase();
+
+            // Manejar tabs especiales
+            if (state.currentTab === 'concepts') {
+                renderConcepts();
+                return;
+            }
+            if (state.currentTab === 'cannib') {
+                renderCannibalization();
+                return;
+            }
+
+            let kws = state.currentTab === 'gaps' ? (c.gap_keywords || [])
+                      : state.currentTab === 'improve' ? (c.weak_keywords || [])
+                      : (c.own_keywords || []);
+
+            // Filter by search text
+            if (search) {
+                kws = kws.filter(k => k.keyword.toLowerCase().includes(search));
+            }
+
+            // Filter by intent
+            if (state.kwIntentFilter !== 'all') {
+                kws = kws.filter(k => k.intent === state.kwIntentFilter);
+            }
+
+            // Sort
+            kws = sortKeywords(kws, state.kwSortBy);
+
+            // Reset display count if not appending
+            if (!append) {
+                state.kwDisplayed = 0;
+            }
+
+            const startIdx = state.kwDisplayed;
+            const endIdx = startIdx + state.kwBatchSize;
+            const batch = kws.slice(startIdx, endIdx);
+            state.kwDisplayed = endIdx;
+
+            const totalFiltered = kws.length;
+
+            // Update more indicator
+            const moreIndicator = $('moreIndicator');
+            if (state.kwDisplayed < totalFiltered) {
+                moreIndicator.style.display = 'block';
+                $('showingCount').textContent = Math.min(state.kwDisplayed, totalFiltered);
+                $('totalCount').textContent = totalFiltered;
+            } else {
+                moreIndicator.style.display = 'none';
+            }
+
+            const html = batch.map(k => renderKeywordCard(k)).join('');
+
+            if (state.kwViewMode === 'cards') {
+                $('kwList').style.display = 'block';
+                $('kwTable').style.display = 'none';
+                if (append) {
+                    $('kwList').insertAdjacentHTML('beforeend', html);
+                } else {
+                    $('kwList').innerHTML = html || '<div class="empty-state"><p>No hay keywords</p></div>';
+                }
+            } else {
+                $('kwList').style.display = 'none';
+                $('kwTable').style.display = 'table';
+                const tableHtml = batch.map(k => renderKeywordRow(k)).join('');
+                if (append) {
+                    $('kwTableBody').insertAdjacentHTML('beforeend', tableHtml);
+                } else {
+                    $('kwTableBody').innerHTML = tableHtml || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;">No hay keywords</td></tr>';
+                }
+            }
+        }
+
+        function sortKeywords(kws, sortBy) {
+            const sorted = [...kws];
+            switch(sortBy) {
+                case 'score_desc':
+                    return sorted.sort((a, b) => (b.opportunity_score || b.weakness_score || 0) - (a.opportunity_score || a.weakness_score || 0));
+                case 'volume_desc':
+                    return sorted.sort((a, b) => (b.volume || 0) - (a.volume || 0));
+                case 'kd_asc':
+                    return sorted.sort((a, b) => (a.kd || 100) - (b.kd || 100));
+                case 'position_asc':
+                    return sorted.sort((a, b) => (a.position || 999) - (b.position || 999));
+                case 'alpha_asc':
+                    return sorted.sort((a, b) => a.keyword.localeCompare(b.keyword));
+                default:
+                    return sorted;
+            }
+        }
+
+        function renderKeywordCard(k) {
+            const isGap = state.currentTab === 'gaps';
+            const isWeak = state.currentTab === 'improve';
+            const score = k.opportunity_score || k.weakness_score || 0;
+            const scoreClass = score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
+            const cardClass = isGap ? 'gap' : isWeak ? 'weak' : 'owned';
+            const escapedKw = k.keyword.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const escapedUrl = (k.url || '').replace(/'/g, "\\'");
+
+            return `
+                <div class="keyword-card ${cardClass}" data-kw="${escapedKw}">
+                    <div class="kw-actions">
+                        <button onclick="copyKeyword('${escapedKw}')" title="Copiar">&#128203;</button>
+                        ${k.url ? `<button onclick="openUrl('${escapedUrl}')" title="Abrir URL">&#128279;</button>` : ''}
+                        <button onclick="toggleFavorite('${escapedKw}')" title="Favorito">&#9734;</button>
+                    </div>
+                    ${score > 0 ? `
+                        <div class="score-bar">
+                            <div class="score-track">
+                                <div class="score-fill ${scoreClass}" style="width: ${score}%;"></div>
+                            </div>
+                            <div class="score-value">${score.toFixed(0)}</div>
+                        </div>
+                    ` : ''}
+                    <div class="kw-text" title="${k.keyword}">
+                        ${k.keyword}
+                        ${k.intent ? `<span class="intent-badge ${k.intent}">${intentLabel(k.intent)}</span>` : ''}
+                        ${k.weakness_score ? `<span class="weakness-badge">Debilidad: ${k.weakness_score}</span>` : ''}
+                    </div>
+                    ${k.weakness_reasons?.length ? `
+                        <div class="weakness-reasons">
+                            ${k.weakness_reasons.map(r => `<span class="reason-tag">${r}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${k.competitors_also_ranking?.length ? `
+                        <div class="competitors" style="margin-top: 4px;">
+                            <small style="color: #9ca3af;">Compiten: </small>
+                            ${k.competitors_also_ranking.map(comp => `<span class="comp-badge">${comp}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${k.url ? `<a href="${k.url}" target="_blank" class="kw-url" title="${k.url}">${k.url}</a>` : ''}
+                    <div class="kw-metrics">
+                        ${k.volume ? `<span>Vol: <strong>${fmt(k.volume)}</strong></span>` : ''}
+                        ${k.kd !== undefined ? `<span>KD: <strong>${k.kd}%</strong></span>` : ''}
+                        ${k.position ? `<span>Pos: <strong>${k.position}</strong></span>` : ''}
+                        ${k.similarity ? `<span>Sim: <strong>${(k.similarity * 100).toFixed(0)}%</strong></span>` : ''}
+                        ${k.num_competitors ? `<span>Comp: <strong>${k.num_competitors}</strong></span>` : ''}
+                    </div>
+                    ${k.competitors?.length ? `
+                        <div class="competitors">
+                            ${k.competitors.map(comp => `<span class="comp-badge">${comp}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${k.related_own_keywords?.length ? `
+                        <div class="related">
+                            <div class="related-title">Keywords relacionados tuyos:</div>
+                            ${k.related_own_keywords.map(r => `<span class="related-kw">${r.keyword} (${(r.similarity*100).toFixed(0)}%)</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function renderKeywordRow(k) {
+            const score = k.opportunity_score || k.weakness_score || 0;
+            const scoreClass = score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low';
+            const escapedKw = k.keyword.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+            return `
+                <tr data-kw="${escapedKw}">
+                    <td><input type="checkbox" onchange="toggleRowSelect(this, '${escapedKw}')"></td>
+                    <td class="kw-cell" title="${k.keyword}">${k.keyword}</td>
+                    <td>${k.volume ? fmt(k.volume) : '-'}</td>
+                    <td>${k.kd !== undefined ? k.kd + '%' : '-'}</td>
+                    <td><span class="score-badge ${scoreClass}">${score.toFixed(0)}</span></td>
+                    <td>${k.intent ? `<span class="intent-badge ${k.intent}">${intentLabel(k.intent)}</span>` : '-'}</td>
+                </tr>
+            `;
+        }
+
+        function loadMoreKeywords() {
+            renderKeywords(true);
+        }
+
+        // Quick actions
+        function copyKeyword(kw) {
+            navigator.clipboard.writeText(kw).then(() => {
+                showToast('Keyword copiado');
+            });
+        }
+
+        function openUrl(url) {
+            if (url) window.open(url, '_blank');
+        }
+
+        function toggleFavorite(kw) {
+            let favs = JSON.parse(localStorage.getItem('kwFavorites') || '[]');
+            if (favs.includes(kw)) {
+                favs = favs.filter(f => f !== kw);
+                showToast('Eliminado de favoritos');
+            } else {
+                favs.push(kw);
+                showToast('Agregado a favoritos');
+            }
+            localStorage.setItem('kwFavorites', JSON.stringify(favs));
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = msg;
+            toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#22c55e;color:white;padding:8px 16px;border-radius:6px;z-index:9999;';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        function toggleRowSelect(checkbox, kw) {
+            // Handle table row selection
+            const row = checkbox.closest('tr');
+            row.classList.toggle('selected', checkbox.checked);
+        }
+
+        function toggleSelectAllTable(checkbox) {
+            const rows = $('kwTableBody').querySelectorAll('input[type="checkbox"]');
+            rows.forEach(cb => {
+                cb.checked = checkbox.checked;
+                cb.closest('tr').classList.toggle('selected', checkbox.checked);
+            });
+        }
+
+        // Render Semantic Concepts
+        function renderConcepts() {
+            if (!state.selectedCluster) return;
+            const concepts = state.selectedCluster.semantic_gaps || [];
+
+            if (concepts.length === 0) {
+                $('kwList').innerHTML = '<div class="empty-state"><p>No hay conceptos semanticos detectados</p></div>';
+                return;
+            }
+
+            $('kwList').innerHTML = concepts.map(concept => {
+                const patternsHave = (concept.patterns_you_have || []).map(p =>
+                    `<span class="pattern-pill have">${PATTERN_LABELS[p] || p}</span>`
+                ).join('');
+                const patternsMissing = (concept.patterns_missing || []).map(p =>
+                    `<span class="pattern-pill missing">${PATTERN_LABELS[p] || p}</span>`
+                ).join('');
+                const patternsComp = (concept.patterns_competitors_have || []).filter(p =>
+                    !(concept.patterns_you_have || []).includes(p) && !(concept.patterns_missing || []).includes(p)
+                ).map(p =>
+                    `<span class="pattern-pill competitor">${PATTERN_LABELS[p] || p}</span>`
+                ).join('');
+
+                const suggestions = (concept.suggestions || []).map(s =>
+                    `<div class="suggestion-item">${s}</div>`
+                ).join('');
+
+                return `
+                    <div class="concept-card">
+                        <div class="concept-name">${concept.concept_name} <small>(${concept.gap_count} gaps)</small></div>
+                        <div style="font-size: 0.8em; color: #9ca3af;">Vol. total: ${fmt(concept.total_volume)}</div>
+                        <div class="pattern-pills">
+                            ${patternsHave ? '<small style="color:#86efac;">Tienes:</small> ' + patternsHave : ''}
+                            ${patternsMissing ? '<small style="color:#fca5a5;">Te falta:</small> ' + patternsMissing : ''}
+                            ${patternsComp ? '<small style="color:#93c5fd;">Comp:</small> ' + patternsComp : ''}
+                        </div>
+                        ${suggestions ? `<div class="concept-suggestions">${suggestions}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render Cannibalization
+        function renderCannibalization() {
+            if (!state.selectedCluster) return;
+            const cannib = state.selectedCluster.cannibalization || { pairs: [] };
+
+            if (cannib.pairs.length === 0) {
+                $('kwList').innerHTML = '<div class="empty-state"><p>No se detecta canibalizacion en este cluster</p></div>';
+                return;
+            }
+
+            $('kwList').innerHTML = cannib.pairs.map(pair => {
+                const conflicts = (pair.conflicting_keywords || []).slice(0, 5).map(c => `
+                    <div class="conflict-pair">
+                        <span>"${c.keyword1}"</span>
+                        <span class="sim">${(c.similarity * 100).toFixed(0)}%</span>
+                        <span>"${c.keyword2}"</span>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="cannib-card ${pair.severity}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="severity-badge ${pair.severity}">${pair.severity}</span>
+                            <span style="font-size: 0.75em; color: #9ca3af;">${pair.total_conflicts} conflictos</span>
+                        </div>
+                        <div class="cannib-urls">
+                            <span class="cannib-url" title="${pair.url1}">${pair.url1}</span>
+                            <span class="cannib-arrow">⟷</span>
+                            <span class="cannib-url" title="${pair.url2}">${pair.url2}</span>
+                        </div>
+                        <div class="cannib-conflicts">${conflicts}</div>
+                        <div class="cannib-recommendation">${pair.recommendation}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Pattern labels
+        const PATTERN_LABELS = {
+            'definition': 'Definicion',
+            'how_it_works': 'Funcionamiento',
+            'tutorial': 'Tutorial',
+            'comparison': 'Comparativa',
+            'list': 'Listado',
+            'review': 'Review',
+            'price': 'Precio',
+            'benefits': 'Beneficios',
+            'generic': 'Generico'
+        };
+
+        // Export
+        function exportData() {
+            if (!state.selectedCluster) return;
+
+            const c = state.selectedCluster;
+            const wb = XLSX.utils.book_new();
+
+            // Summary
+            const summary = [
+                ['Content Gap Analysis - ' + c.name],
+                [],
+                ['Keywords propios', c.own_keywords_count],
+                ['Keywords debiles', c.weak_keywords_count || 0],
+                ['Gaps identificados', c.gap_keywords_count],
+                ['Volumen gaps', c.total_volume_gaps || c.total_volume || 0],
+                ['Score promedio', c.avg_opportunity_score?.toFixed(1) || '-'],
+                [],
+                ['Exportado', new Date().toLocaleString()]
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Resumen');
+
+            // Gaps
+            const gapsData = [['Keyword', 'Volumen', 'KD', 'Score', 'Competidores', 'Similitud', 'Keywords Relacionados']];
+            (c.gap_keywords || []).forEach(g => {
+                gapsData.push([
+                    g.keyword,
+                    g.volume || '',
+                    g.kd || '',
+                    g.opportunity_score?.toFixed(1) || '',
+                    (g.competitors || []).join(', '),
+                    g.similarity ? (g.similarity * 100).toFixed(0) + '%' : '',
+                    (g.related_own_keywords || []).map(r => r.keyword).join(', ')
+                ]);
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gapsData), 'Gaps');
+
+            // Owned
+            const ownedData = [['Keyword', 'Volumen', 'Posicion', 'KD', 'URL']];
+            (c.own_keywords || []).forEach(o => {
+                ownedData.push([o.keyword, o.volume || '', o.position || '', o.kd || '', o.url || '']);
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ownedData), 'Propios');
+
+            // Weak keywords (A Mejorar)
+            const weakData = [['Keyword', 'Volumen', 'Posicion', 'KD', 'Debilidad', 'Razones', 'Competidores', 'URL']];
+            (c.weak_keywords || []).forEach(w => {
+                weakData.push([
+                    w.keyword, 
+                    w.volume || '', 
+                    w.position || '', 
+                    w.kd || '', 
+                    w.weakness_score || '',
+                    (w.weakness_reasons || []).join(', '),
+                    (w.competitors_also_ranking || []).join(', '),
+                    w.url || ''
+                ]);
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(weakData), 'A Mejorar');
+
+            XLSX.writeFile(wb, `content_gap_${c.name.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+        }
+
+        // Utils
+        function fmt(n) {
+            if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+            return n?.toString() || '0';
+        }
+
+        function intentLabel(intent) {
+            const labels = {
+                'informational': 'Info',
+                'transactional': 'Trans',
+                'commercial': 'Comerc',
+                'navigational': 'Navig',
+                'mixed': 'Mixed'
+            };
+            return labels[intent] || intent;
+        }
+
+        // Saved analyses
+        async function loadSavedAnalyses() {
+            try {
+                const r = await fetch('http://localhost:5000/list_analyses?limit=10');
+                if (!r.ok) throw new Error('Error cargando');
+                const data = await r.json();
+                renderSavedAnalyses(data.analyses || []);
+            } catch (e) {
+                $('savedAnalyses').innerHTML = '<div style="color:#64748b;font-size:0.8em;text-align:center;padding:10px;">Sin análisis guardados</div>';
+            }
+        }
+
+        function renderSavedAnalyses(analyses) {
+            if (!analyses.length) {
+                $('savedAnalyses').innerHTML = '<div style="color:#64748b;font-size:0.8em;text-align:center;padding:10px;">Sin análisis guardados</div>';
+                return;
+            }
+            $('savedAnalyses').innerHTML = analyses.map(a => {
+                const date = new Date(a.created_at * 1000).toLocaleDateString('es');
+                const totalGaps = (a.summary?.gaps_assigned || 0) + (a.summary?.gaps_unassigned || 0);
+                return `
+                    <div class="saved-analysis-item" onclick="loadSavedAnalysis('${a.id}')">
+                        <button class="del" onclick="event.stopPropagation();deleteAnalysis('${a.id}')">×</button>
+                        <div class="name">${a.name}</div>
+                        <div class="meta">
+                            <span>Clusters: <strong>${a.summary?.total_clusters || '-'}</strong></span>
+                            <span>Gaps: <strong>${totalGaps || '-'}</strong></span>
+                            <span>Sin asignar: <strong>${a.summary?.gaps_unassigned || 0}</strong></span>
+                            <span>${date}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadSavedAnalysis(id) {
+            showLoading('Cargando análisis...', 50);
+            try {
+                const r = await fetch(`http://localhost:5000/load_analysis/${id}`);
+                if (!r.ok) throw new Error('No encontrado');
+                state.data = await r.json();
+                renderResults();
+                hideLoading();
+            } catch (e) {
+                hideLoading();
+                alert('Error cargando análisis: ' + e.message);
+            }
+        }
+
+        async function deleteAnalysis(id) {
+            if (!confirm('¿Eliminar este análisis?')) return;
+            try {
+                await fetch(`http://localhost:5000/delete_analysis/${id}`, {method: 'DELETE'});
+                loadSavedAnalyses();
+            } catch (e) { console.error(e); }
+        }
+
+        // ============================================
+        // NUEVAS FUNCIONALIDADES UI
+        // ============================================
+
+        // Toast notifications
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast' + (isError ? ' error' : '');
+            toast.innerHTML = (isError ? '❌ ' : '✅ ') + message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Colapsar panel izquierdo
+        function togglePanel() {
+            const panel = $('panelLeft');
+            const main = $('mainLayout');
+            const btn = $('collapseBtn');
+            panel.classList.toggle('collapsed');
+            main.classList.toggle('panel-collapsed');
+            btn.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
+        }
+
+        // Ordenamiento de clusters
+        function sortClusters(clusters, sortBy) {
+            const sorted = [...clusters];
+            switch(sortBy) {
+                case 'gaps_desc': return sorted.sort((a,b) => b.gap_keywords_count - a.gap_keywords_count);
+                case 'gaps_asc': return sorted.sort((a,b) => a.gap_keywords_count - b.gap_keywords_count);
+                case 'volume_desc': return sorted.sort((a,b) => (b.total_volume||0) - (a.total_volume||0));
+                case 'authority_desc': return sorted.sort((a,b) => (b.authority_score||0) - (a.authority_score||0));
+                case 'authority_asc': return sorted.sort((a,b) => (a.authority_score||0) - (b.authority_score||0));
+                case 'coverage_desc': return sorted.sort((a,b) => {
+                    const covA = a.own_keywords_count / (a.own_keywords_count + a.gap_keywords_count) * 100;
+                    const covB = b.own_keywords_count / (b.own_keywords_count + b.gap_keywords_count) * 100;
+                    return covB - covA;
+                });
+                case 'name_asc': return sorted.sort((a,b) => a.name.localeCompare(b.name));
+                default: return sorted;
+            }
+        }
+
+        // Toggle vistas (grid/tabla/comparativa)
+        let currentView = 'grid';
+        function setView(view) {
+            currentView = view;
+            const grid = $('clustersGrid');
+            const table = $('clustersTable');
+            const compare = $('compareMode');
+
+            grid.classList.toggle('hidden', view !== 'grid');
+            table.classList.toggle('visible', view === 'table');
+            compare.classList.toggle('visible', view === 'compare');
+
+            $('viewGrid').classList.toggle('active', view === 'grid');
+            $('viewTable').classList.toggle('active', view === 'table');
+            $('viewCompare').classList.toggle('active', view === 'compare');
+
+            if (view === 'table') renderTable();
+            if (view === 'compare') loadCompareOptions();
+        }
+
+        // Renderizar tabla de clusters
+        function renderTable() {
+            if (!state.data?.clusters) return;
+            const tbody = $('clustersTableBody');
+            const sorted = sortClusters(state.data.clusters, $('sortSelect')?.value || 'gaps_desc');
+
+            tbody.innerHTML = sorted.map(c => {
+                const coverage = Math.round(c.own_keywords_count / (c.own_keywords_count + c.gap_keywords_count) * 100);
+                return `
+                    <tr onclick="selectCluster('${c.name}')" class="${state.selectedCluster === c.name ? 'selected' : ''}">
+                        <td><strong>${c.name}</strong></td>
+                        <td>${c.own_keywords_count}</td>
+                        <td style="color:#ef4444;font-weight:600;">${c.gap_keywords_count}</td>
+                        <td>${c.weak_keywords?.length || 0}</td>
+                        <td>${Math.round(c.authority_score || 0)}</td>
+                        <td>${coverage}%</td>
+                        <td><span class="intent-badge ${c.dominant_intent || 'mixed'}">${c.dominant_intent || '-'}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Multi-select
+        let selectedKeywords = new Set();
+
+        function toggleKeywordSelect(keyword, checkbox) {
+            if (checkbox.checked) {
+                selectedKeywords.add(keyword);
+            } else {
+                selectedKeywords.delete(keyword);
+            }
+            updateMultiSelectBar();
+        }
+
+        function updateMultiSelectBar() {
+            const bar = $('multiSelectBar');
+            const count = selectedKeywords.size;
+            $('selectedCount').textContent = count;
+            bar.classList.toggle('visible', count > 0);
+        }
+
+        function clearSelection() {
+            selectedKeywords.clear();
+            document.querySelectorAll('.keyword-checkbox').forEach(cb => cb.checked = false);
+            updateMultiSelectBar();
+        }
+
+        // Paginacion de keywords
+        let keywordsPage = 1;
+        const keywordsPerPage = 100;
+
+        function loadMoreKeywords() {
+            keywordsPage++;
+            renderKeywords(true);
+        }
+
+        function updateMoreIndicator(total, showing) {
+            const indicator = $('moreIndicator');
+            if (showing < total) {
+                indicator.style.display = 'block';
+                $('showingCount').textContent = showing;
+                $('totalCount').textContent = total;
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        // Exportacion mejorada
+        function toggleExportMenu() {
+            $('exportMenu').classList.toggle('visible');
+        }
+
+        function exportCluster(format) {
+            const cluster = state.data?.clusters?.find(c => c.name === state.selectedCluster);
+            if (!cluster) return showToast('Selecciona un cluster primero', true);
+
+            const data = getExportData(cluster);
+            downloadFile(data, `cluster_${cluster.name}`, format);
+            $('exportMenu').classList.remove('visible');
+            showToast(`Exportado a ${format.toUpperCase()}`);
+        }
+
+        function exportAll(format) {
+            if (!state.data?.clusters) return showToast('No hay datos para exportar', true);
+
+            if (format === 'xlsx') {
+                const wb = XLSX.utils.book_new();
+
+                // Hoja de resumen
+                const summary = [{
+                    'Total Clusters': state.data.clusters.length,
+                    'Total Gaps': state.data.summary?.gaps_assigned || 0,
+                    'Sin Asignar': state.data.summary?.gaps_unassigned || 0,
+                    'Autoridad Promedio': state.data.summary?.avg_authority_score || 0
+                }];
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Resumen');
+
+                // Hoja de clusters
+                const clustersData = state.data.clusters.map(c => ({
+                    Cluster: c.name,
+                    Propios: c.own_keywords_count,
+                    Gaps: c.gap_keywords_count,
+                    Mejorar: c.weak_keywords?.length || 0,
+                    Autoridad: Math.round(c.authority_score || 0),
+                    Intent: c.dominant_intent || '-'
+                }));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clustersData), 'Clusters');
+
+                // Hoja de gaps
+                const allGaps = state.data.clusters.flatMap(c =>
+                    (c.gap_keywords || []).map(g => ({...g, cluster: c.name}))
+                );
+                if (allGaps.length) {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allGaps), 'Todos los Gaps');
+                }
+
+                // Sin asignar
+                if (state.data.unassigned_gaps?.length) {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.data.unassigned_gaps), 'Sin Asignar');
+                }
+
+                XLSX.writeFile(wb, 'analisis_completo.xlsx');
+            }
+
+            $('exportMenu').classList.remove('visible');
+            showToast('Analisis completo exportado');
+        }
+
+        function exportSelected(format) {
+            if (selectedKeywords.size === 0) return showToast('Selecciona keywords primero', true);
+
+            const cluster = state.data?.clusters?.find(c => c.name === state.selectedCluster);
+            if (!cluster) return;
+
+            const allKws = [...(cluster.gap_keywords || []), ...(cluster.own_keywords || [])];
+            const selected = allKws.filter(kw => selectedKeywords.has(kw.keyword));
+
+            downloadFile(selected, 'keywords_seleccionadas', format);
+            showToast(`${selected.length} keywords exportadas`);
+        }
+
+        function getExportData(cluster) {
+            return {
+                gaps: cluster.gap_keywords || [],
+                own: cluster.own_keywords || [],
+                weak: cluster.weak_keywords || [],
+                concepts: cluster.concepts || []
+            };
+        }
+
+        function downloadFile(data, filename, format) {
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename + '.json';
+                a.click();
+            } else if (format === 'csv') {
+                const rows = Array.isArray(data) ? data : (data.gaps || []);
+                if (!rows.length) return;
+                const headers = Object.keys(rows[0]);
+                const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${r[h] || ''}"`).join(','))].join('\n');
+                const blob = new Blob([csv], {type: 'text/csv'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename + '.csv';
+                a.click();
+            } else {
+                const rows = Array.isArray(data) ? data : (data.gaps || []);
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Data');
+                XLSX.writeFile(wb, filename + '.xlsx');
+            }
+        }
+
+        // Comparativa A/B
+        async function loadCompareOptions() {
+            try {
+                const r = await fetch('http://localhost:5000/list_analyses?limit=20');
+                const data = await r.json();
+                const options = (data.analyses || []).map(a =>
+                    `<option value="${a.id}">${a.name} (${new Date(a.created_at*1000).toLocaleDateString()})</option>`
+                ).join('');
+                $('compareA').innerHTML = '<option value="">Seleccionar...</option>' + options;
+                $('compareB').innerHTML = '<option value="">Seleccionar...</option>' + options;
+            } catch (e) { console.error(e); }
+        }
+
+        async function runComparison() {
+            const idA = $('compareA').value;
+            const idB = $('compareB').value;
+            if (!idA || !idB) return;
+
+            try {
+                const [rA, rB] = await Promise.all([
+                    fetch(`http://localhost:5000/load_analysis/${idA}`).then(r => r.json()),
+                    fetch(`http://localhost:5000/load_analysis/${idB}`).then(r => r.json())
+                ]);
+
+                renderComparison(rA, rB);
+            } catch (e) {
+                showToast('Error cargando analisis', true);
+            }
+        }
+
+        function renderComparison(dataA, dataB) {
+            const clustersA = new Set((dataA.clusters || []).map(c => c.name));
+            const clustersB = new Set((dataB.clusters || []).map(c => c.name));
+
+            let htmlA = '<h4>Clusters</h4>';
+            let htmlB = '<h4>Clusters</h4>';
+
+            // En A pero no en B
+            clustersA.forEach(name => {
+                if (!clustersB.has(name)) {
+                    htmlA += `<div class="compare-diff added">+ ${name}</div>`;
+                }
+            });
+
+            // En B pero no en A
+            clustersB.forEach(name => {
+                if (!clustersA.has(name)) {
+                    htmlB += `<div class="compare-diff added">+ ${name}</div>`;
+                }
+            });
+
+            // Metricas
+            htmlA += `<h4 style="margin-top:16px;">Metricas</h4>`;
+            htmlA += `<div>Clusters: ${dataA.clusters?.length || 0}</div>`;
+            htmlA += `<div>Gaps: ${dataA.summary?.gaps_assigned || 0}</div>`;
+
+            htmlB += `<h4 style="margin-top:16px;">Metricas</h4>`;
+            htmlB += `<div>Clusters: ${dataB.clusters?.length || 0}</div>`;
+            htmlB += `<div>Gaps: ${dataB.summary?.gaps_assigned || 0}</div>`;
+
+            $('compareContentA').innerHTML = htmlA;
+            $('compareContentB').innerHTML = htmlB;
+        }
+
+        // Events
+        function init() {
+            // File uploads
+            $('ownZone').onclick = () => $('ownFile').click();
+            $('ownFile').onchange = e => handleOwnFile(e.target.files[0]);
+
+            $('compZone').onclick = () => $('compFile').click();
+            $('compFile').onchange = e => { handleCompFile(e.target.files[0]); e.target.value = ''; };
+
+            // Drag & drop
+            ['ownZone', 'compZone'].forEach(id => {
+                const el = $(id);
+                el.ondragover = e => { e.preventDefault(); el.style.borderColor = '#22d3ee'; };
+                el.ondragleave = () => el.style.borderColor = '';
+                el.ondrop = e => {
+                    e.preventDefault();
+                    el.style.borderColor = '';
+                    if (id === 'ownZone') handleOwnFile(e.dataTransfer.files[0]);
+                    else handleCompFile(e.dataTransfer.files[0]);
+                };
+            });
+
+            // Slider
+            $('simThresh').oninput = e => $('simVal').textContent = parseFloat(e.target.value).toFixed(2);
+            $('canibThresh').oninput = e => $('canibVal').textContent = parseFloat(e.target.value).toFixed(2);
+            $('louvainRes').oninput = e => $('louvainResVal').textContent = parseFloat(e.target.value).toFixed(1);
+
+            // Clustering method selector
+            $('clusteringMethod').onchange = e => {
+                const method = e.target.value;
+                // Mostrar/ocultar opciones segun metodo
+                $('louvainResGroup').style.display = method === 'louvain' ? 'block' : 'none';
+                // El numero de clusters solo aplica a KMeans
+                $('numClusters').parentElement.style.opacity = method === 'kmeans' ? '1' : '0.5';
+            };
+
+            // Analyze
+            $('analyzeBtn').onclick = analyze;
+
+            // Tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.onclick = () => {
+                    state.currentTab = tab.dataset.tab;
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    renderKeywords();
+                };
+            });
+
+            // Search
+            $('searchKw').oninput = () => renderKeywords();
+
+            // Intent filter chips
+            document.querySelectorAll('.intent-chips .chip').forEach(chip => {
+                chip.onclick = () => {
+                    state.kwIntentFilter = chip.dataset.intent;
+                    document.querySelectorAll('.intent-chips .chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    renderKeywords();
+                };
+            });
+
+            // Sort dropdown
+            $('kwSortBy').onchange = (e) => {
+                state.kwSortBy = e.target.value;
+                renderKeywords();
+            };
+
+            // View toggle
+            $('viewCards').onclick = () => {
+                state.kwViewMode = 'cards';
+                $('viewCards').classList.add('active');
+                $('viewTableKw').classList.remove('active');
+                renderKeywords();
+            };
+            $('viewTableKw').onclick = () => {
+                state.kwViewMode = 'table';
+                $('viewTableKw').classList.add('active');
+                $('viewCards').classList.remove('active');
+                renderKeywords();
+            };
+
+            // Infinite scroll with IntersectionObserver
+            const moreIndicator = $('moreIndicator');
+            const infiniteObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && moreIndicator.style.display !== 'none') {
+                        loadMoreKeywords();
+                    }
+                });
+            }, { rootMargin: '100px' });
+            infiniteObserver.observe(moreIndicator);
+
+            // Export
+            $('exportBtn').onclick = exportData;
+
+            // Check server
+            checkServer();
+            setInterval(checkServer, 30000);
+
+            // Saved analyses
+            loadSavedAnalyses();
+            $('refreshAnalyses').onclick = loadSavedAnalyses;
+
+            // Intent filter
+            document.querySelectorAll('.intent-filter-btn').forEach(btn => {
+                btn.onclick = () => {
+                    state.intentFilter = btn.dataset.intent;
+                    document.querySelectorAll('.intent-filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderClusters();
+                };
+            });
+
+            // Colapsar panel
+            $('collapseBtn').onclick = togglePanel;
+
+            // Ordenamiento
+            $('sortSelect').onchange = () => {
+                renderClusters();
+                if (currentView === 'table') renderTable();
+            };
+
+            // Buscador de clusters (texto)
+            $('searchClusters').oninput = () => {
+                // Si hay búsqueda semántica activa, limpiarla al escribir
+                if (state.semanticSearchActive) {
+                    clearSemanticSearch();
+                } else {
+                    renderClusters();
+                    if (currentView === 'table') renderTable();
+                }
+            };
+
+            // Buscador semántico
+            $('semanticSearchBtn').onclick = () => {
+                if (state.semanticSearchActive) {
+                    clearSemanticSearch();
+                } else {
+                    semanticSearchClusters();
+                }
+            };
+
+            // También buscar con Enter
+            $('searchClusters').onkeydown = e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    semanticSearchClusters();
+                }
+            };
+
+            // Toggle vistas
+            $('viewGrid').onclick = () => setView('grid');
+            $('viewTable').onclick = () => setView('table');
+            $('viewCompare').onclick = () => setView('compare');
+
+            // Comparativa
+            $('compareA').onchange = runComparison;
+            $('compareB').onchange = runComparison;
+
+            // Cerrar menu export al hacer click fuera
+            document.addEventListener('click', e => {
+                if (!e.target.closest('.export-dropdown')) {
+                    $('exportMenu').classList.remove('visible');
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

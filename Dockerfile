@@ -38,9 +38,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Crear directorios necesarios (uploads, logs, cache numba, cache huggingface)
-RUN mkdir -p /app/uploads /app/logs /tmp/numba_cache /app/.cache/huggingface && \
-    chmod 777 /app/uploads /app/logs /tmp/numba_cache /app/.cache/huggingface
+# Crear directorios necesarios (uploads, logs, data, cache numba, cache huggingface)
+RUN mkdir -p /app/uploads /app/logs /app/data /tmp/numba_cache /app/.cache/huggingface && \
+    chmod 777 /app/uploads /app/logs /app/data /tmp/numba_cache /app/.cache/huggingface
 
 # Pre-descargar modelo de Sentence Transformers (evita descarga en runtime)
 # Solo se usa el modelo español 768D por mayor precisión semántica

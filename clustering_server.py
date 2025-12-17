@@ -151,7 +151,10 @@ import pickle
 import zlib
 
 # Configuración del cache
-CACHE_DB_PATH = os.path.join(os.path.dirname(__file__), 'embeddings_cache.db')
+# Usar /app/data para persistencia con Docker, o directorio local en desarrollo
+DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(__file__), 'data'))
+os.makedirs(DATA_DIR, exist_ok=True)
+CACHE_DB_PATH = os.path.join(DATA_DIR, 'embeddings_cache.db')
 CACHE_TTL = 86400 * 7  # 7 días de vida
 CACHE_MAX_ENTRIES = 1000  # Máximo número de entradas
 

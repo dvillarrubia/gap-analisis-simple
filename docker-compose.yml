@@ -15,12 +15,15 @@ services:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
       - LLM_PROVIDER=none
+      - DATA_DIR=/app/data
     volumes:
       # Persistir modelos descargados entre reinicios
       - model-cache:/home/appuser/.cache
       - huggingface-cache:/home/appuser/.cache/huggingface
       # Persistir uploads
       - ./uploads:/app/uploads
+      # Persistir base de datos SQLite (análisis guardados + cache embeddings)
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
